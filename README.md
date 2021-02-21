@@ -6,7 +6,7 @@
 
 # How to run a CCA using the CCApackage: 
 
-* Put the files 'CCApackage.R' and 'main_CCA.R' in your current R working directory
+* Put the files 'CCApackage.R' and 'main_CCA.R' in your current R work directory
 * Open R version >= 4.0.1
 * Open the file named 'main_CCA.R'
 * Read the comments and choose to run one of the described runCCA function modes
