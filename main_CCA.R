@@ -64,7 +64,7 @@ list_param <- list(
     plotCC_height = 10,                                                      # CCA plot: figure dimension: height
     # GENERIC PLOT PARAMETERS
     plots_canonical_variate = c(1, 2),                                       # The two main canonical variates chosen for plotting
-    plots_group_color = NULL,                                                # Color for each group of individuals: example - supose you have two groups, A and B, in the GROUP column, then you could define plots_group_color = c("A" = "red", "B" = "blue"). analogous for more (or less) than two groups
+    plots_group_color = "auto",                                              # Color for each group of individuals: example - suppose you have two groups, A and B, in the GROUP column, then you could define plots_group_color = c("A" = "red", "B" = "blue"). analogous for more (or less) than two groups. choose "auto" for automatic determination of colors.
     plots_x_title = "Dataset X",                                             # title describing the first dataset (data_X)
     plots_y_title = "Dataset Y",                                             # title describing the second dataset (data_Y)
     plots_short_x_title = "x",                                               # short label for the first dataset (data_X)
@@ -91,7 +91,7 @@ list_param <- list(
 
 #cca <- runCCA(publish = FALSE) # run CCA using default values for parameters (list_param is not considered here)
 
-#cca <- runCCA(list_param, publish = TRUE) # run CCA using custom values for parameters (using list_param)
+#cca <- runCCA(list_param, publish = FALSE) # run CCA using custom values for parameters (using list_param)
 
 ## choose publish = TRUE if you have already found a good set of values for list_param and achieved a CCA you consider is great for publication.
 ## the object 'cca' will hold the outputs of ranCCA. useful if you plan to do further analysis. 

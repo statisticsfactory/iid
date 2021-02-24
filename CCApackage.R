@@ -1,8 +1,10 @@
 loadPackagesCCA <- function(force_install_all_packages = FALSE) {
-  message("Installing and loading required packages ...")
+  cat("Installing and loading required packages ...", "\n")
 
   suppressMessages({
     load_lib <- c(
+    #file management
+    "filesstrings",
     #data manipulation:
       "readxl",
       "purrr",
@@ -130,7 +132,7 @@ statCCA <- function(X, Y, regularization = FALSE, n_points = 5) {
     cca_cor <- whitening::cca(as.matrix(X), as.matrix(Y))$lambda
   } else {
     cat("(this process can take a while) Searching for the optimum regularization parameter ...", "\n")
-    grid <- list(lambda1 = seq(0.001, 1, length = n_point), lambda2 = seq(0.001, 1, length = n_point))
+    grid <- list(lambda1 = seq(0.001, 1, length = n_points), lambda2 = seq(0.001, 1, length = n_points))
     regul <- estim.regul(X, Y, grid$lambda1, grid$lambda2, plt = FALSE)
     lambda <- c(regul$lambda1, regul$lambda2)
     cca <- rcc(X, Y, lambda[1], lambda[2])
@@ -173,17 +175,19 @@ statCCA <- function(X, Y, regularization = FALSE, n_points = 5) {
       Rv2 <- sum(diag(Reduce("+", Bzi2[1:i]))) / Rv
       output <- c(U = Ru2, V = Rv2)
     }))
-    colnames(var_expl) <- paste0("Cumulative_Variance_of_", colnames(var_expl))
+    colnames(var_expl) <- paste0("Cumulative_Variance_of_", c("U", "V"))
 
     message("Do not analyse the variance explained by CCA if your data was not scaled, cosider only the canonical correlations.")
   } else {
-    var_expl <- NULL
+    value <- rep(0, min(x, y))
+    var_expl <- data.frame(U = value, V = value)
+    colnames(var_expl) <- paste0("Cumulative_Variance_of_", c("U", "V"))
   }
 
   output <- list(
     summary = c(n_var_X = x, n_var_Y = y),
     results = list(cca_cor = cca_cor, var_expl = var_expl),
-    coefs = list(A = cca$xcoef, B = cca$xcoef),
+    coefs = list(A = cca$xcoef, B = cca$ycoef),
     scores = list(U = cca$scores$xscores, V = cca$scores$yscores),
     correlations = list(Rux = cca$scores$corr.X.xscores, Rvy = cca$scores$corr.Y.yscores, 
                         Rvx = cca$scores$corr.Y.xscores, Ruy = cca$scores$corr.X.yscores),
@@ -224,17 +228,25 @@ newDir <- function(dir_name, at_root = TRUE, root) {
   return(path)
 }
 
-saveTable <- function(p, title, ...) {
+saveTable <- function(publish = FALSE, p, title, ...) {
   path <- newDir(...) 
 
   if (dir.exists(path)) {
-    path_csv <- newDir(csv_format, FALSE, path)
+    if(!publish) {
+      path_csv <- newDir("csv_format", FALSE, path)
+    } else {
+      path_csv <- path
+    }
     write.csv(p, file = paste(path_csv, paste0(title, ".csv"), sep = "/"), quote = FALSE, row.names = FALSE)
     
-    path_html <- newDir(html_format, FALSE, path)
-    DT::saveWidget(datatable(round(p, 5)), file = paste(path_html, paste0(title, ".html"), sep = "/"), selfcontained = FALSE)
-
-    message("table '",  title, "' saved in: ", path_csv, ", and", path_html, ".")
+    if(!publish) {
+      path_html <- newDir("html_format", FALSE, path)
+      DT::saveWidget(datatable(round(p, 5)), file = paste(path_html, paste0(title, ".html"), sep = "/"), selfcontained = FALSE)
+    } else {
+      path_html <- "no html returned"
+    }
+    
+    message("table '",  title, "' saved in: ", path_csv, ", and ", path_html, ".")
   } else {
     stop("It was not possible to create a folder to store tables.")
   }
@@ -266,22 +278,24 @@ savePlot <- function(p = NULL, title, width, height, extension = "pdf", ...) {
   }
 }
 
-plotScores <- function(cca, canonical_variate = 1:2, id = 1, g = 1, g_col = NULL, cv_col = "gold", x_title = "X", y_title = "Y",
-                       short_x_title = "x", short_y_title = "y") {
+plotScores <- function(cca, canonical_variate = 1:2, id = 1, g = 1, g_col = "auto", cv_col = "gold", x_title = "X", 
+                       y_title = "Y", short_x_title = "x", short_y_title = "y") {
   max_cvs <- min(ncol(cca$cca_data$X), ncol(cca$cca_data$Y))
   
   if (length(canonical_variate) > 2) stop("plots_canonical_variate should have exactly two entries.")
   if (any(canonical_variate < 0) | any(canonical_variate > (max_cvs - 1))) stop("Entries of plots_canonical_variate should be at least equal to 1 and most equal to ", max_cvs - 1, ".")
   
-  if (is.null(g_col)) {
+  if (g_col == "auto") {
     groups <- as.character(unique(g))
     g_col <- 1:length(groups)
     names(g_col) <- groups
+  } else if (!((g_col == "auto") | is.vector(g_col))) {
+    stop("'plots_group_color' should be a vector or 'auto'.")
   }
   
   groups <- as.character(unique(g))
   comparison <- setdiff(groups, names(g_col))
-  if (length(comparison)) stop("The folowing groups do not have corresponding color in 'plotScore_group_color': ", paste(comparison, collapse = ", "))
+  if (length(comparison)) stop("The folowing groups do not have corresponding color in 'plots_group_color': ", paste(comparison, collapse = ", "))
   
   cca_x <- cca$scores$U[, canonical_variate]
   cca_y <- cca$scores$V[, canonical_variate]
@@ -313,8 +327,8 @@ plotScores <- function(cca, canonical_variate = 1:2, id = 1, g = 1, g_col = NULL
     geom_point(alpha = 0.6, size = 2, shape = 3) +
     geom_hline(yintercept = 0, alpha = 0.6, color = cv_col, size = 1.5) +
     geom_vline(xintercept = 0, alpha = 0.6, color = cv_col, size = 1.5) +
-    geom_text(aes(label = label_x), x = min_x, y = 0.15, color = cv_col, size = 4.2, fontface = "bold") +
-    geom_text(aes(label = label_y), x = 0.1, y = min_y, color = cv_col, angle = 90, size = 4.2, fontface = "bold") +
+    geom_text(aes(label = label_x), x = min_x, y = 0.3, color = cv_col, size = 4.2, fontface = "bold") +
+    geom_text(aes(label = label_y), x = 0.2, y = min_y, color = cv_col, angle = 90, size = 4.2, fontface = "bold") +
     facet_wrap(~ set, labeller = as_labeller(facet_label)) +
     scale_colour_manual("Group: ", values = g_col) +
     scale_y_continuous(breaks = seq(-100, 100, 1)) +
@@ -343,8 +357,8 @@ plotCoef <- function(cca, canonical_variate = 1:2, x_title = "X", y_title = "Y",
   if (length(canonical_variate) > 2) stop("plots_canonical_variate should have exactly two entries.")
   if (any(canonical_variate < 0) | any(canonical_variate > (max_cvs - 1))) stop("Entries of plots_canonical_variate should be at least equal to 1 and most equal to ", max_cvs - 1, ".")
   
-  CoefRaw_X <- data.frame(cca$scores$U[, canonical_variate], "X")
-  CoefRaw_Y <- data.frame(cca$scores$V[, canonical_variate], "Y")
+  CoefRaw_X <- data.frame(cca$coefs$A[, canonical_variate], "X")
+  CoefRaw_Y <- data.frame(cca$coefs$B[, canonical_variate], "Y")
   colnames(CoefRaw_Y) <- colnames(CoefRaw_X) <- c(paste0("CV", canonical_variate), "Set")
   
   CoefRaw_XY <- rbind(CoefRaw_X, CoefRaw_Y)
@@ -356,7 +370,7 @@ plotCoef <- function(cca, canonical_variate = 1:2, x_title = "X", y_title = "Y",
   melt_CoefRaw_XY$lables <- factor(melt_CoefRaw_XY$lables, levels = unique(melt_CoefRaw_XY$lables), ordered = TRUE)
   melt_CoefRaw_XY$Vars <- factor(melt_CoefRaw_XY$Vars, levels = unique(melt_CoefRaw_XY$Vars), ordered = TRUE)
   
-  p <- ggplot(melt_CoefRaw_XY, aes(x = Vars, xend = Vars, yend = abs(value), colour = ifelse(value < 0, "Negative", "Positive"))) +
+  p <- ggplot(melt_CoefRaw_XY, aes(x = Vars, xend = Vars, yend = abs(value), group = Set, colour = ifelse(value < 0, "Negative", "Positive"))) +
     geom_segment(aes(y = 0)) +
     geom_point(aes(y = abs(value)), show.legend = FALSE) +
     facet_wrap(~ lables, scales = "free_x", ncol = 1) +
@@ -375,7 +389,7 @@ plotCoef <- function(cca, canonical_variate = 1:2, x_title = "X", y_title = "Y",
       legend.box.background = element_rect(colour = "black")) +
     labs(y = "Absolute value of the raw estimated coefficient for canonical variate", x = "")
   
-  output <- list(p = p, df = melt_CoefStand_XY)
+  output <- list(p = p, df = melt_CoefRaw_XY)
   
   return(output)
 }
@@ -425,18 +439,22 @@ plotStruct <- function(cca, canonical_variate = 1:2, x_title = "X", y_title = "Y
   return(output)
 }
 
-plotCorrel <- function(cca, pos_col = "blue", neg_col = "red") {
+plotCorrel <- function(cca, pos_col = "blue", neg_col = "red", regularization = FALSE) {
   correl <- cca$results$cca_cor
   n <- length(correl)
   df_correl <- data.frame(cca_correl = correl, cca_pair = paste0(1:n, "º"))
   df_correl <- arrange(df_correl, -abs(correl))
   df_correl$cca_pair <- factor(df_correl$cca_pair, levels = unique(df_correl$cca_pair), ordered = TRUE)
   
-  p <- ggplot(df_correl, aes(x = cca_pair, xend = cca_pair, yend = abs(cca_correl), colour = ifelse(cca_correl < 0, "Negative", "Positive"))) +
-    geom_segment(aes(y = 0)) +
-    geom_point(aes(y = abs(cca_correl)), show.legend = FALSE) +
+  if (regularization) {
+    p <- ggplot(df_correl, aes(x = cca_pair, xend = cca_pair, yend = abs(cca_correl)))
+  } else {
+    p <- ggplot(df_correl, aes(x = cca_pair, xend = cca_pair, yend = abs(cca_correl), colour = ifelse(cca_correl < 0, "Negative", "Positive"))) +
+      scale_color_manual("Correlation sign: ", values = c("Negative" = neg_col, "Positive" = pos_col))
+  }
+  
+  p <- p + geom_segment(aes(y = 0)) + geom_point(aes(y = abs(cca_correl)), show.legend = FALSE) +
     scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.1)) +
-    scale_color_manual("Correlation sign: ", values = c("Negative" = neg_col, "Positive" = pos_col)) +
     theme_classic() +
     theme(
       legend.text = element_text(size = 13),
@@ -695,7 +713,7 @@ formatCCATables <- function(cca) {
   if (!is.null(results$var_expl)) {
     df_results <- round(data.frame(results$var_expl, Canonical_Correlation = results$cca_cor), 5)
   } else {
-    df_results <- round(data.frame(NA, NA, Canonical_Correlation = results$cca_cor), 5)
+    df_results <- round(data.frame(-1, -1, Canonical_Correlation = results$cca_cor), 5)
   }
   colnames(df_results) <- c("Cumulative Variance of CV (X)", "Cumulative Variance of CV (Y)", "Canonical Correlation of CV Pair")
   formated_results <- list(df_results)
@@ -716,7 +734,7 @@ formatCCATables <- function(cca) {
   
   output <- c(formated_results, formated_cancor, formated_pearson)
   output <- output[c("corX", "corY", "corXY", "Rux", "Rvy", "A", "B", "U", "V", "CumulativeVarExpl_CanonicalCorr")]
-  names(output) <- c("[p1 and p4]", "[p2 and p5]", "[p3 and p6]", "[p7 and p10 for X]", "[p7 and p10 for Y]", "[p13 for X]", "[p13 for Y]", "[p9 for X]", "[p9 for Y]", "[p11 and p12]")
+  names(output) <- c("[p1 and p4]", "[p2 and p5]", "[p3 and p6]", "[p7 and p10 for X]", "[p7 and p10 for Y]", "[p9 for X]", "[p9 for Y]", "[p13 for X]", "[p13 for Y]", "[p11 and p12]")
   
   return(output)
 }
@@ -743,9 +761,11 @@ tableLegends <- function(cca_tables, x_title, y_title) {
     "(middle column) Cumulative variance of ", y_title, " explained by its corresponding canonical variates.",
     "(rightmost column) Canonical correlation for the n-th pair of canonical variates.")
   
-  leg_ScoresX <- paste0("Scores of the individuals on each canonical variate obtained for ", x_title, ".")
+  leg_ScoresX <- paste0("Scores of the individuals on each canonical variate obtained for ", x_title, ".",
+    " Individuals are sorted by ID.")
   
-  leg_ScoresY <- paste0("Scores of the individuals on each canonical variate obtained for ", y_title, ".")
+  leg_ScoresY <- paste0("Scores of the individuals on each canonical variate obtained for ", y_title, ".",
+    " Individuals are sorted by ID.")
   
   output <- paste0(intro1, "\n\n", paste(paste(names(cca_tables), c(leg_CorX, leg_CorY, leg_CorXY, leg_CoefStructX, leg_CoefStructY, leg_CoefEstX, leg_CoefEstY, leg_ScoresX, leg_ScoresY, leg_CumVarCC), sep = ": "), sep = "\n\n"))
   
@@ -779,7 +799,7 @@ descMeasures <- function(df1, df2, print_out = TRUE) {
   return(output)
 }
 
-figLegends <- function(x_title, y_title, x_col, y_col, cv_col, pos_col, neg_col, graph_corr_min, cca_corr_min, canonical_variate, n_canonical_variates) {
+figLegends <- function(x_title, y_title, x_col, y_col, cv_col, pos_col, neg_col, graph_corr_min, cca_corr_min, canonical_variate, n_canonical_variates, regularization) {
   if(length(canonical_variate) < n_canonical_variates) {
     text1 <- paste0(canonical_variate[1], " and ", canonical_variate[2])
   } else {
@@ -864,7 +884,10 @@ figLegends <- function(x_title, y_title, x_col, y_col, cv_col, pos_col, neg_col,
   leg_p12 <- paste0(
     "[p12](canonical-correlation-between-pairs-of-canonical-variates): ",
     "Estimated Canonical correlations for pairs of canonical variates.",
-    " Positive and negative correlations are represented by lines colored ", pos_col, " and ", neg_col,", respectively."
+    ifelse(regularization,
+      " The estimated canonical correlation are unsigned.",
+      paste0(" Positive and negative correlations are represented by lines colored ", pos_col, " and ", neg_col,", respectively.")
+    )
   )
   
   leg_p13 <- paste0(
@@ -874,7 +897,7 @@ figLegends <- function(x_title, y_title, x_col, y_col, cv_col, pos_col, neg_col,
     " Groups of individuals are colored according to the plot legend."
   )
   
-  output <- paste(intro1, leg_p1, leg_p2, leg_p3, leg_p4, leg_p5, leg_p6, leg_p7, leg_p8, leg_p9, leg_p10, leg_p11, leg_p12, leg_13, sep = "\n\n")
+  output <- paste(intro1, leg_p1, leg_p2, leg_p3, leg_p4, leg_p5, leg_p6, leg_p7, leg_p8, leg_p9, leg_p10, leg_p11, leg_p12, leg_p13, sep = "\n\n")
   
   return(output)
 }
@@ -911,7 +934,7 @@ checkParameters <- function(list_param) {
     plotCC_width = 20,
     plotCC_height = 10,
     plots_canonical_variate = c(1, 2),
-    plots_group_color = NULL,
+    plots_group_color = "auto",
     plots_x_title = "Dataset X",
     plots_y_title = "Dataset Y",
     plots_short_x_title = "x",
@@ -945,14 +968,14 @@ checkParameters <- function(list_param) {
   return(parameters)
 }
 
-runCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
-  new_path <- newDir("output_CCA")
+routineCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
+  old_path <- new_path <- newDir("output_CCA")
   
-  message_log <- file("messages.log", open = "a")
-  sink(message_log, type = "message")
+  message_log <- file(paste(new_path, "messages.log", sep = "/"), open = "a")
+  sink(message_log, type = "message", append = FALSE)
   
-  outputs_log <- file("outputs.log", open = "a")
-  sink(outputs_log, type = "outputs", split = TRUE)
+  outputs_log <- file(paste(new_path, "outputs.log", sep = "/"), open = "a")
+  sink(outputs_log, type = "output", split = TRUE, append = FALSE)
   
   message("current work directory: ", getwd())
   
@@ -982,12 +1005,12 @@ runCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
     if (n_sheets < 2) {
       stop("Excel file should have at least 2 spreadsheets.")
     } else if ((data_sheet1 > 0 & data_sheet1 <= n_sheets) & (data_sheet2 > 0 & data_sheet2 <= n_sheets)) {
-      cat("Spreadsheets ", data_sheet1, " and ", data_sheet2, " were selected for CCA.", "\n")
+      cat("Spreadsheets ", data_sheet1, " and ", data_sheet2, " were selected for ", ifelse(rCCA_regularization, "regularized CCA", "CCA"), ".", "\n")
     } else {
       data_sheet1 = 1
       data_sheet2 = 2
       message("Reset variables to: data_sheet1 = 1 and data_sheet2 = 2.")
-      cat("Only the first two spreadsheets were used for CCA.", "\n")
+      cat("Only the first two spreadsheets were used for ", ifelse(rCCA_regularization, "regularized CCA", "CCA"), ".", "\n")
     }
 
     dfs$dfs <- dfs$dfs[c(data_sheet1, data_sheet2)]
@@ -996,20 +1019,21 @@ runCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
     n_sheets <- NULL
   }
 
-  colnames_check <- sum(sapply(dfs, function(.x) sum(colnames(.x)[1:2] != c("GROUP", "ID"))))
+  colnames_check <- sum(sapply(dfs$dfs, function(.x) sum(colnames(.x)[1:2] != c("GROUP", "ID"))))
   if (colnames_check) stop("In both datasets, first and second columns should be named GROUP and ID, respectively.")
   
-  ids <- lapply(dfs, function(.x) .x$ID)
-  id_ckeck_1 <- ids[[1]] != ids[[2]]
-  id_check_2 <- setdiff(ids[[1]], ids[[2]])
-  id_check_3 <- table(ids[[1]]) > 1
-  if (id_ckeck_1 & id_ckeck_2 & id_ckeck_3) stop("There are unmached or repeated ids in the datasets.")
+  ids <- lapply(dfs$dfs, function(.x) .x$ID)
+  id_check_1 <- any(ids[[1]] != ids[[2]])
+  id_check_2 <- length(setdiff(ids[[1]], ids[[2]]))
+  id_check_3 <- any(table(ids[[1]]) > 1)
+  if (id_check_1 & id_check_2 & id_check_3) stop("There are unmached or repeated ids in the datasets.")
   
-  dfs_names <- names(dfs)
-  dfs_sorted <- lapply(1:2, function(.x) dfs[order(ids[[.x]]), ])
+  dfs_names <- names(dfs$dfs)
+  dfs_sorted <- lapply(1:2, function(.x) dfs$dfs[[.x]][order(ids[[.x]]), ])
+  names(dfs_sorted) <- dfs_names
   ID <- dfs_sorted[[1]]$ID
   GROUP <- dfs_sorted[[1]]$GROUP
-  dfs <- lapply(dfs, function(.x) .x[, -(1:2)])
+  dfs$dfs <- lapply(dfs$dfs, function(.x) .x[, -(1:2)])
   
   dimXY <- sapply(dfs$dfs, dim)
   if (diff(dimXY[1, ])) stop("Datasets does not have the same number of rows.")
@@ -1035,14 +1059,18 @@ runCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
 
   cca <- statCCA(data_X, data_Y, rCCA_regularization, rCCA_n_points)
 
+  cat("Generating tables ...", "\n")
+  
   cca_tables <- formatCCATables(cca)
-  sapply(1:length(cca_tables), function(.x) {
-    saveTable(cca_tables[[.x]], names(cca_tables)[.x], dir_name = "tables", at_root = FALSE, root = new_path)
+  saved_tables <- sapply(1:length(cca_tables), function(.x) {
+    saveTable(FALSE, cca_tables[[.x]], names(cca_tables)[.x], dir_name = "tables", at_root = FALSE, root = new_path)
   })
 
   if (publish) {
-    saveTable(cca$cca_data$X, "dataset_X", dir_name = "data", at_root = FALSE, root = new_path)
-    saveTable(cca$cca_data$Y, "dataset_Y", dir_name = "data", at_root = FALSE, root = new_path)
+    newX <- data.frame(GROUP = GROUP, ID = ID, cca$cca_data$X)
+    newY <- data.frame(GROUP = GROUP, ID = ID, cca$cca_data$Y)
+    saveTable(TRUE, newX, "dataset_X", dir_name = "data", at_root = FALSE, root = new_path)
+    saveTable(TRUE, newY, "dataset_Y", dir_name = "data", at_root = FALSE, root = new_path)
 
     path_code <- newDir("code", at_root = FALSE, root = new_path)
 
@@ -1061,8 +1089,8 @@ runCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
 
     parameters[["data_log_trans"]] <- FALSE
     parameters[["data_scale_trans"]] <- FALSE
-    parameters[["data_X"]] <- as.data.frame(cca$cca_data$X)
-    parameters[["data_Y"]] <- as.data.frame(cca$cca_data$Y)
+    parameters[["data_X"]] <- newX
+    parameters[["data_Y"]] <- newY
     list.save(parameters, file = paste(path_code, "list_param.rdata", sep = "/"))
     cond3 <- length(list.files(path_code, pattern = "^(list_param.rdata)$"))
     if(!cond3) stop("Could not save file 'list_param.rdata' in ", path_code, ".")
@@ -1092,59 +1120,63 @@ runCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
   
   path_fig <- newDir("figures", at_root = FALSE, root = new_path)
   
+  cat("Generating plots ...", "\n")
+  
   p1 <- plotCor(cca$pearson_cor$corX, "X", heatmap_clust_method, heatmap_color_ramp, heatmap_border_color, heatmap_fontsize)
-  savePlot(p1$p, "heatmap_matrix-of-pearson-correlations-for-variables-from-set-X", heatmap_width, heatmap_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
+  savePlot(p1$p, "[p1]heatmap_matrix-of-pearson-correlations-for-variables-from-set-X", heatmap_width, heatmap_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
   
   p2 <- plotCor(cca$pearson_cor$corY, "Y", heatmap_clust_method, heatmap_color_ramp, heatmap_border_color, heatmap_fontsize)
-  savePlot(p2$p, "heatmap_matrix-of-pearson-correlations-for-variables-from-set-Y", heatmap_width, heatmap_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
+  savePlot(p2$p, "[p2]heatmap_matrix-of-pearson-correlations-for-variables-from-set-Y", heatmap_width, heatmap_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
   
   p3 <- plotCor(cca$pearson_cor$corXY, "XY", heatmap_clust_method, heatmap_color_ramp, heatmap_border_color, heatmap_fontsize)
-  savePlot(p3$p, "heatmap_matrix-of-pearson-correlations-for-variables-from-set-XY", heatmap_width, heatmap_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
+  savePlot(p3$p, "[p3]heatmap_matrix-of-pearson-correlations-for-variables-from-set-XY", heatmap_width, heatmap_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
   
   p4 <- plotCorNetwork(cca$pearson_cor$corX, "X", cca = NULL, plotCorCCA_corr_min, plotCorCCA_seed, plotCorCCA_node_size, plotCorCCA_label_size, plots_x_color,
     plots_y_color, plots_cv_color, plots_neg_color, plots_pos_color, plotCorCCA_net_method)
-  savePlot(p4$p, "graph_matrix-of-pearson-correlations-for-variables-from-set-X", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
+  savePlot(p4$p, "[p4]graph_matrix-of-pearson-correlations-for-variables-from-set-X", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
   
   p5 <- plotCorNetwork(cca$pearson_cor$corY, "Y", cca = NULL, plotCorCCA_corr_min, plotCorCCA_seed, plotCorCCA_node_size, plotCorCCA_label_size, plots_x_color,
     plots_y_color, plots_cv_color, plots_neg_color, plots_pos_color, plotCorCCA_net_method)
-  savePlot(p5$p, "graph_matrix-of-pearson-correlations-for-variables-from-set-Y", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
+  savePlot(p5$p, "[p5]graph_matrix-of-pearson-correlations-for-variables-from-set-Y", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
   
   p6 <- plotCorNetwork(cca$pearson_cor$corXY, "XY", cca, plotCorCCA_corr_min, plotCorCCA_seed, plotCorCCA_node_size, plotCorCCA_label_size, plots_x_color,
     plots_y_color, plots_cv_color, plots_neg_color, plots_pos_color, plotCorCCA_net_method)
-  savePlot(p6$p, "graph_matrix-of-pearson-correlations-for-variables-from-set-XY", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
+  savePlot(p6$p, "[p6]graph_matrix-of-pearson-correlations-for-variables-from-set-XY", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "pearson-correlations", at_root = FALSE, root = path_fig)
   
   p7 <- plotCCA(cca, plots_canonical_variate, plotCCA_corr_min, plots_x_title, plots_y_title, plots_short_x_title, plots_short_y_title, plots_x_color, plots_y_color, plots_cv_color)
-  savePlot(p7$p, "2Dplane_correlations-for-variables-with-canonical-variables", plotCCA_width, plotCCA_height, plots_file_extension, dir_name = "cca", at_root = FALSE, root = path_fig)
+  savePlot(p7$p, "[p7]2Dplane_correlations-for-variables-with-canonical-variables", plotCCA_width, plotCCA_height, plots_file_extension, dir_name = "cca", at_root = FALSE, root = path_fig)
 
   corr_cca <- corCCA(cca, plotCorCCA_n_canonical_variates, plots_canonical_variate, plots_short_x_title, plots_short_y_title)
   p8 <- plotCorNetwork(corr_cca, "all", cca, plotCorCCA_corr_min, plotCorCCA_seed, plotCorCCA_node_size, plotCorCCA_label_size, plots_x_color,
     plots_y_color, plots_cv_color, plots_neg_color, plots_pos_color, plotCorCCA_net_method)
-  savePlot(p8$p, "graph_matrix-of-pearson-correlations-for-variables-from-set-XandYandCV", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "cca", at_root = FALSE, root = path_fig)
+  savePlot(p8$p, "[p8]graph_matrix-of-pearson-correlations-for-variables-from-set-XandYandCV", plotCorCCA_width, plotCorCCA_height, plots_file_extension, dir_name = "cca", at_root = FALSE, root = path_fig)
 
   p9 <- plotCoef(cca, plots_canonical_variate, plots_x_title, plots_y_title, plots_pos_color, plots_neg_color) 
-  savePlot(p9$p, "raw-estimated-coefficients-of-canonical-variable", plotEst_width, plotEst_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
+  savePlot(p9$p, "[p9]raw-estimated-coefficients-of-canonical-variable", plotEst_width, plotEst_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
   
   p10 <- plotStruct(cca, plots_canonical_variate, plots_x_title, plots_x_title, plots_pos_color, plots_neg_color, plotCCA_corr_min)
-  savePlot(p10$p, "1Dlines_correlations-for-variables-with-canonical-variables", plotEst_width, plotEst_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
+  savePlot(p10$p, "[p10]1Dlines_correlations-for-variables-with-canonical-variables", plotEst_width, plotEst_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
   
   p11 <- plotCumVarExpl(cca, plots_x_title, plots_y_title, plots_x_color, plots_y_color)
-  savePlot(p11$p, "cumulative-variance-explained-by-canonical-variables", plotCumVar_width, plotCumVar_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
+  savePlot(p11$p, "[p11]cumulative-variance-explained-by-canonical-variables", plotCumVar_width, plotCumVar_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
   
-  p12 <- plotCorrel(cca, plots_pos_color, plots_neg_color)
-  savePlot(p12$p, "canonical-correlation-between-pairs-of-canonical-variates", plotCC_width, plotCC_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
+  p12 <- plotCorrel(cca, plots_pos_color, plots_neg_color, rCCA_regularization)
+  savePlot(p12$p, "[p12]canonical-correlation-between-pairs-of-canonical-variates", plotCC_width, plotCC_height, plots_file_extension, dir_name = "cca-extra-figures", at_root = FALSE, root = path_fig)
   
-  p13 <- plotScores(cca, plots_canonical_variate, ID, GROUP, plots_group_col, plots_cv_color, plots_x_title, plots_y_title, plots_short_x_title, plots_x_title)
-  savePlot(p13$p, "scores-of-individuals-on-canonical-variates", plotCCA_width, plotCCA_height, plots_file_extension, dir_name = "cca", at_root = FALSE, root = path_fig)
+  p13 <- plotScores(cca, plots_canonical_variate, ID, GROUP, plots_group_color, plots_cv_color, plots_x_title, plots_y_title, plots_short_x_title, plots_short_y_title)
+  savePlot(p13$p, "[p13]scores-of-individuals-on-canonical-variates", plotCCA_width, plotCCA_height, plots_file_extension, dir_name = "cca", at_root = FALSE, root = path_fig)
   
-  leg_fig <- figLegends(plots_x_title, plots_y_title, plots_x_color, plots_y_color, plots_cv_color, plots_pos_color, plots_neg_color, plotCorCCA_corr_min, plotCCA_corr_min, plots_canonical_variate, plotCorCCA_n_canonical_variates)
+  leg_fig <- figLegends(plots_x_title, plots_y_title, plots_x_color, plots_y_color, plots_cv_color, plots_pos_color, plots_neg_color, plotCorCCA_corr_min, plotCCA_corr_min, plots_canonical_variate, plotCorCCA_n_canonical_variates, rCCA_regularization)
   write.table(leg_fig, file = paste(new_path, "figures", "all_legends.txt", sep = "/"), quote = FALSE, row.names = FALSE, col.names = FALSE)
   
   leg_tables <- tableLegends(cca_tables, plots_x_title, plots_y_title)
   write.table(leg_tables, file = paste(new_path, "tables", "all_legends.txt", sep = "/"), quote = FALSE, row.names = FALSE, col.names = FALSE)
   
+  cat("Calculating statistics ...", "\n")
+  
   desc <- descMeasures(cca$cca_data$X, cca$cca_data$Y, print_descriptive_statistics)
-  saveTable(desc$desc_X$Descriptives, "description_for_X", dir_name = "descriptive-analysis", at_root = FALSE, root = new_path)
-  saveTable(desc$desc_Y$Descriptives, "description_for_Y", dir_name = "descriptive-analysis", at_root = FALSE, root = new_path)
+  saveTable(FALSE, desc$desc_X$Descriptives, "description_for_X", dir_name = "descriptive-analysis", at_root = FALSE, root = new_path)
+  saveTable(FALSE, desc$desc_Y$Descriptives, "description_for_Y", dir_name = "descriptive-analysis", at_root = FALSE, root = new_path)
   message("If you have chosen to transform your data (log, sqrt, scale), consider descriptive statistics calculated for the transformed data.")
   
   cat("CCA is finished. Results are in path: ", new_path, "\n")
@@ -1152,16 +1184,47 @@ runCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
   output <- list(
     CCA = cca,
     tables = cca_tables,
+    plots = lapply(list(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13), "[[", 1),
+    data_plots = lapply(list(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13), "[[", 2),
     stat_desc = desc,
-    plots = lapply(list(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12), "[[", 1),
-    data_plots = lapply(list(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12), "[[", 2),
-    figlegends = leg_fig,
-    tablelegends = leg_tables)
+    fig_legends = leg_fig,
+    table_legends = leg_tables)
   
-  names(output$plots) <- paste0("p", 1:12)
-  names(output$data_plots) <- paste0("data_p", 1:12)
-  
-  closeAllConnections()
+  names(output$plots) <- paste0("p", 1:13)
+  names(output$data_plots) <- paste0("data_p", 1:13)
   
   return(output)
+}
+
+possiblyCCA <- possibly(routineCCA, "error")
+
+runCCA <- function(...) {
+  tryCCA <- possiblyCCA(...)
+  closeAllConnections()
+  
+  message("Moving .log files ...")
+  
+  output_dir <- paste(getwd(), "output_CCA", sep = "/")
+  dirs <- file.info(list.dirs(output_dir, full.names = TRUE))
+  recent_dir <- rownames(dirs)[which.max(dirs$mtime)]
+  
+  file.move(paste(output_dir, "messages.log", sep = "/"), recent_dir)
+  file.move(paste(output_dir, "outputs.log", sep = "/"), recent_dir)
+  
+  if (is.character(tryCCA)) {
+    dir_new <- gsub(":| ", "-", format(Sys.time(), "%Y-%m-%d_%X"))
+    new_path <- newDir(dir_new, at_root = FALSE, root = output_dir)
+    
+    file.move(paste(recent_dir, "messages.log", sep = "/"), new_path)
+    file.move(paste(recent_dir, "outputs.log", sep = "/"), new_path)
+    
+    error <- paste0("The proccess was aborted due to errors. Look-up the files 'messages.log' and 'outputs.log' in:\n", new_path, ".")
+    write.table(error, file = paste(new_path, "ERROR.log", sep = "/"), quote = FALSE, row.names = FALSE, col.names = FALSE)
+    
+    unlink(recent_dir, recursive = TRUE)
+    
+    message("\n", "Proccess has failed.", "\n", "Look-up the files in ", new_path, ".", "\n")
+  }
+  
+  return(tryCCA)
 }

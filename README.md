@@ -1,3 +1,8 @@
+# What does it do?
+
+* The code performs Canonical Correlation Analysis (CCA) using the CCA R package
+* It also includes the regularized CCA from the CCA R package
+
 # Files and folder description:
 
 * demo-data: folder containing example data for testing the package
