@@ -442,7 +442,7 @@ plotStruct <- function(cca, canonical_variate = 1:2, x_title = "X", y_title = "Y
 plotCorrel <- function(cca, pos_col = "blue", neg_col = "red", regularization = FALSE) {
   correl <- cca$results$cca_cor
   n <- length(correl)
-  df_correl <- data.frame(cca_correl = correl, cca_pair = paste0(1:n, "º"))
+  df_correl <- data.frame(cca_correl = correl, cca_pair = paste0(1:n, ""))
   df_correl <- arrange(df_correl, -abs(correl))
   df_correl$cca_pair <- factor(df_correl$cca_pair, levels = unique(df_correl$cca_pair), ordered = TRUE)
   
@@ -1196,7 +1196,7 @@ routineCCA <- function(list_param = list(empty = TRUE), publish = FALSE) {
   return(output)
 }
 
-possiblyCCA <- possibly(routineCCA, "error")
+possiblyCCA <- purrr::possibly(routineCCA, "error")
 
 runCCA <- function(...) {
   tryCCA <- possiblyCCA(...)
