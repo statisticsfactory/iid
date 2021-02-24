@@ -40,11 +40,11 @@ in another computer.
 
 ## Changing the plots without needing to re-run ```runCCA()```
 
-The outputs of ```runCCA()``` are automaticly save in the folders *output_CCA* or *R_CCA*, depending on the mode you choose for the *publish* parameter.
+The outputs of ```runCCA()``` are automaticly save in the folders *output_CCA* or *R_CCA*, depending on the mode you choose for the **publish** parameter.
 But if the results need to be hold in an R object for further analysis or modifications, just do ```results <- runCCA()```. The *results* object is an R list
 containing all plots, tables, estimates and legends generates by the ```runCCA()```.
 
-All plots cam be accessed through ```results$plots```, which will have 13 plots saved as *p1, p2, ..., p13*. All plots are generated using the functionalities of 
+All plots can be accessed through ```results$plots```, which will have 13 plots saved as *p1, p2, ..., p13*. All plots are generated using the functionalities of 
 the ggplot2 R package. It means, new layers of graphics can be added to enhance any plot. For example, suppose you wat to enlarge the x axis text of the plot *p1*,
 you could do this:
 ~~~
@@ -54,5 +54,18 @@ Now suppose you want to change the legend position on plot *p13*:
 ~~~
 new_plot13 <- results$plots$p13 + theme(legend.position = "bottom")
 ~~~
-Any other suitable ggplot2 layer could be added to *p1*. For a complete list of features you can change using the theme() layer, look-uk the 
-<https://ggplot2.tidyverse.org/reference/theme.html>. For any other changes, make a google search for **how to do something with ggplot2**.
+Any other suitable ggplot2 layer could be added to *p1, p2, ..., p13*. For a complete list of features you can change using the theme() layer, look-uk the 
+<https://ggplot2.tidyverse.org/reference/theme.html>. For any other changes, make a google search for **how to do** *something* **with ggplot2**.
+
+To save the new plots use the function ```savePlot()``` from the *CCApackage.R* file:
+~~~
+savePlot(new_plot1, title = "plot1 with larger x axis text", width = 13, height = 7, extension = "pdf", at_root = TRUE)
+savePlot(new_plot13, title = "plot13 with legend at bottom", width = 13, height = 7, extension = "pdf", at_root = TRUE)
+~~~
+where the pararameters **width** and **height** control the size of the saved figure, **extension** can be "pdf" or "png", **at_root = TRUE** specifies the figure
+will be saved on the current R work directory. Use **at_root = FALSE** and add the parameter **root** to indicate the path were you want to save the figure.
+For example:
+~~~
+savePlot(new_plot1, title = "plot1 with larger x axis text", width = 13, height = 7, extension = "pdf", at_root = FALSE, root = "C:/")
+~~~
+will save the figure at *C:\*.
