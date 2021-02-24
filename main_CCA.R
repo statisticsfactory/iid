@@ -94,4 +94,4 @@ list_param <- list(
 #cca <- runCCA(list_param, publish = FALSE) # run CCA using custom values for parameters (using list_param)
 
 ## choose publish = TRUE if you have already found a good set of values for list_param and achieved a CCA you consider is great for publication.
-## the object 'cca' will hold the outputs of ranCCA. useful if you plan to do further analysis. 
+## the object 'cca' will hold the outputs of runCCA. useful if you plan to do further analysis. 

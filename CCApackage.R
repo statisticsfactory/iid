@@ -126,12 +126,13 @@ dataScale <- function(dfs) {
 }
 
 statCCA <- function(X, Y, regularization = FALSE, n_points = 5) {
+  t1 <- Sys.time()
   if (!regularization) {
     regul <- NULL
     cca <- cc(X, Y)
     cca_cor <- whitening::cca(as.matrix(X), as.matrix(Y))$lambda
   } else {
-    cat("(this process can take a while) Searching for the optimum regularization parameter ...", "\n")
+    cat("(this proccess can take a while) Searching for the optimum regularization parameter ...", "\n")
     grid <- list(lambda1 = seq(0.001, 1, length = n_points), lambda2 = seq(0.001, 1, length = n_points))
     regul <- estim.regul(X, Y, grid$lambda1, grid$lambda2, plt = FALSE)
     lambda <- c(regul$lambda1, regul$lambda2)
@@ -143,7 +144,9 @@ statCCA <- function(X, Y, regularization = FALSE, n_points = 5) {
       cat("Hint: try to increase 'rCCA_n_points'.", "\n")
     }
   }
-
+  t2 <- Sys.time() - t1
+  cat("Time elapsed running ", ifelse(regularization, "regularized CCA", "CCA"), " = ", t2, "\n")
+  
   X <- as.matrix(X)
   Y <- as.matrix(Y)
   x <- ncol(X)
@@ -486,7 +489,7 @@ plotCumVarExpl <- function(cca, x_title = "X", y_title = "Y", x_col = "red", y_c
     geom_line() +
     geom_point() +
     scale_y_continuous(breaks = seq(0, 1, 0.1), labels = scales::percent_format(accuracy = 1)) +
-    scale_x_discrete(labels = paste0(melt_df_var_expl$cca_pair, "º")) +
+    scale_x_discrete(labels = paste0(melt_df_var_expl$cca_pair, "")) +
     scale_colour_manual("Dataset: ", 
                         values = c("Cumulative_Variance_of_U" = x_col, "Cumulative_Variance_of_V" = y_col),
                         labels = c("Cumulative_Variance_of_U" = x_title, "Cumulative_Variance_of_V" = y_title)) +
