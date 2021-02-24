@@ -29,6 +29,9 @@ list_param <- list(
     # GENERIC PARAMETERS
     force_install_all_packages = FALSE,                                      # if packages do not load correctly, set this parameter to TRUE
     print_descriptive_statistics = TRUE,                                     # print out in the R console descriptive measures for each variable in 'data_X' and 'data_Y'  
+    # REGULARIZED CCA (WHEN N OF VARIABLES GREATER THAN N OF OBSERVATIONS)
+    rCCA_regularization = FALSE,                                             # rCCA: use TRUE if you selected more variables than you have observations in your datasets
+    rCCA_n_points = 10,                                                      # rCCA: number of grid points used for searching the optimum regularization parameter lambda. more points can lead to a better approximation, but also to a substantially higher searching time for the algorithm
     # PLOT: HEATMAP OF PEARSON CORRELATIONS
     heatmap_clust_method = "ward.D2",                                        # Correlation plot: method for clustering correlation matrices (enter ?hclust in the R console for other allowed clustering methods)
     heatmap_color_ramp = RColorBrewer::brewer.pal(n = 7, name = "RdYlBu"),   # Correlation plot: gradient of colors for filling correlation matrix
@@ -51,7 +54,6 @@ list_param <- list(
     plotCCA_height = 7,                                                      # CCA plot: figure dimension: height
     plotCCA_max_overlaps = 1000,                                             # CCA plot: maximum number of labels that are aloud to overlap. reduce it for avoiding labels that overlap too much 
     # PLOT: ESTIMATES OF CANONICAL VARIATES (COEFFICIENTS AND CORRELATIONS)
-    plotEst_standardize = FALSE,                                             # CCA plot: Should estimated coefficients for the canonical variates be standardized?: TRUE or FALSE
     plotEst_width = 20,                                                      # CCA plot: figure dimension: width
     plotEst_height = 15,                                                     # CCA plot: figure dimension: height
     # PLOT: CUMULATIVE VARIANCE OF CANONICAL VARIATES
@@ -62,6 +64,7 @@ list_param <- list(
     plotCC_height = 10,                                                      # CCA plot: figure dimension: height
     # GENERIC PLOT PARAMETERS
     plots_canonical_variate = c(1, 2),                                       # The two main canonical variates chosen for plotting
+    plots_group_color = NULL,                                                # Color for each group of individuals: example - supose you have two groups, A and B, in the GROUP column, then you could define plots_group_color = c("A" = "red", "B" = "blue"). analogous for more (or less) than two groups
     plots_x_title = "Dataset X",                                             # title describing the first dataset (data_X)
     plots_y_title = "Dataset Y",                                             # title describing the second dataset (data_Y)
     plots_short_x_title = "x",                                               # short label for the first dataset (data_X)
