@@ -50,7 +50,7 @@ new_plot1 <- results$plots$p1 + theme(axis.text.x = element_text(size = 24))
 ~~~
 Now suppose you want to change the legend position on plot *p13*:
 ~~~
-new_plot1 <- results$plots$p1 + theme(legend.position = "bottom")
+new_plot13 <- results$plots$p13 + theme(legend.position = "bottom")
 ~~~
 Any other suitable ggplot2 layer could be added to *p1*. For a complete list of features you can change using the theme() layer, look-uk the 
 <https://ggplot2.tidyverse.org/reference/theme.html>. For any other changes, make a google search for **how to do something with ggplot2**.
